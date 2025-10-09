@@ -50,7 +50,9 @@ npm run dev
 ```
 Then open your browser to http://localhost:5173 (or whichever port is shown).
 
-#🧭 Project Structure
+---
+
+## 🧭 Project Structure
 astronomyChart/
 ├── src/
 │   ├── routes/          # Pages (+page.svelte, +layout.svelte)
@@ -61,14 +63,20 @@ astronomyChart/
 ├── svelte.config.js
 └── vite.config.ts
 
-#🌙 Future Improvements
+---
 
-1. Add constellation drawings
-2. Implement star magnitude filters
-3. Display moon phase and planetary visibility
-4. Support time zone auto-detection
+## 🌙 Future Improvements
+
+1. 📍 Display precise **positions** for each star and constellation  
+   (e.g. *15° west of north, 45° above the horizon*)  
+2. 🌐 Add **language selection** — switch between **English** and **中文**  
+3. 🌌 Expand and update the **star catalog** with more celestial objects  
+4. 🔗 Create **dedicated pages** for each star and constellation  
+   — click a name to view detailed descriptions, visibility data, and mythology
 
 
-#🪐 Author
+---
+
+## 🪐 Author
 Created by Caiqi (Maggie) Rao (github: Huginn-ai)
-Feel free to visit the live site → mr-sky.vercel.app
+Discord: mingerke_67210
