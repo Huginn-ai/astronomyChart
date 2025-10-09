@@ -53,6 +53,7 @@ Then open your browser to http://localhost:5173 (or whichever port is shown).
 ---
 
 ## 🧭 Project Structure
+```
 astronomyChart/
 ├── src/
 │   ├── routes/          # Pages (+page.svelte, +layout.svelte)
@@ -62,7 +63,7 @@ astronomyChart/
 ├── package.json
 ├── svelte.config.js
 └── vite.config.ts
-
+```
 ---
 
 ## 🌙 Future Improvements
