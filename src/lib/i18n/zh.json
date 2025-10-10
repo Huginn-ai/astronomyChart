@@ -1,0 +1,16 @@
+{
+  "home_title": "星空漫游入门指南",
+  "city_label": "城市（可选）",
+  "city_placeholder": "例如：Beijing / 北京 / London / 伦敦",
+  "city_fill_btn": "用城市填入",
+  "city_not_found": "未找到该城市，请换一个更常见的城市名称，或直接填写经纬度。",
+  "city_matched_prefix": "已匹配",
+  "city_matched_suffix": "（已自动填入经纬度）",
+  "lat_label": "纬度（-90 ~ 90）",
+  "lon_label": "经度（-180 ~ 180）",
+  "time_label": "时间",
+  "submit_cta": "查看当晚可见目标",
+  "lang_toggle": "English",
+  "star_name": "星名"
+
+}

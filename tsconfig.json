@@ -1,19 +1,22 @@
 {
-	"extends": "./.svelte-kit/tsconfig.json",
-	"compilerOptions": {
-		"allowJs": true,
-		"checkJs": true,
-		"esModuleInterop": true,
-		"forceConsistentCasingInFileNames": true,
-		"resolveJsonModule": true,
-		"skipLibCheck": true,
-		"sourceMap": true,
-		"strict": true,
-		"moduleResolution": "bundler"
-	}
-	// Path aliases are handled by https://svelte.dev/docs/kit/configuration#alias
-	// except $lib which is handled by https://svelte.dev/docs/kit/configuration#files
-	//
-	// To make changes to top-level options such as include and exclude, we recommend extending
-	// the generated config; see https://svelte.dev/docs/kit/configuration#typescript
+  //"extends": "./.svelte-kit/tsconfig.json",
+  "compilerOptions": {
+    // —— 与 bundler 模式配套 —— //
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "target": "es2022",
+    "lib": ["es2022", "dom"],
+    "verbatimModuleSyntax": true,
+
+    // —— 一般建议 —— //
+    "allowJs": true,
+    "checkJs": false,                   // 如果你希望校验 JS，可改为 true
+    "resolveJsonModule": true,          // 允许导入 *.json（给 i18n 用）
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "sourceMap": true,
+    "noEmit": true
+  }
 }

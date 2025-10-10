@@ -1,0 +1,16 @@
+{
+  "home_title": "Sky Visibility (Lite)",
+  "city_label": "City (optional)",
+  "city_placeholder": "e.g. Beijing / 北京 / London / 伦敦",
+  "city_fill_btn": "Fill from city",
+  "city_not_found": "City not found. Try a more common name or enter latitude & longitude directly.",
+  "city_matched_prefix": "Matched",
+  "city_matched_suffix": "(latitude & longitude auto-filled)",
+  "lat_label": "Latitude (-90 ~ 90)",
+  "lon_label": "Longitude (-180 ~ 180)",
+  "time_label": "Time",
+  "submit_cta": "See tonight’s visible targets",
+  "lang_toggle": "中文",
+  "star_name": "Star"
+
+}
