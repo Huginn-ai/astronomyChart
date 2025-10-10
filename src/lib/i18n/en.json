@@ -17,24 +17,59 @@
   "settings": "Observation settings",
   "visibleStars": "Visible stars",
   "visibleAsterisms": "Visible asterisms",
-
   "place": "Location",
   "latitude": "Latitude",
   "longitude": "Longitude",
   "time": "Time",
-
   "alt": "Altitude (°)",
   "az": "Azimuth",
   "unit_degree": "°",
-
   "noStars": "No targets right now — it may be daytime or below the horizon.",
   "none": "None",
-
   "dir_N": "N",
   "dir_E": "E",
   "dir_S": "S",
   "dir_W": "W",
   "dir_of": "of",
-  "dir_unknown": "Unknown"
+  "dir_unknown": "Unknown",
 
+  "star:Sirius": "Sirius",
+  "star:Vega": "Vega",
+  "star:Canopus": "Canopus",
+  "star:Castor": "Castor",
+  "star:Pollux": "Pollux",
+  "star:Capella": "Capella",
+  "star:Alpha_Cen": "Alpha Centauri",
+  "star:Fomalhaut": "Fomalhaut",
+  "star:Altair": "Altair",
+  "star:Deneb": "Deneb",
+  "star:Antares": "Antares",
+  "star:Betelgeuse": "Betelgeuse",
+  "star:Alphard": "Alphard",
+  "star:Aldebaran": "Aldebaran",
+  "star:Spica": "Spica",
+  "star:Rigel": "Rigel",
+  "star:Procyon": "Procyon",
+  "star:Regulus": "Regulus",
+  "star:Arcturus": "Arcturus",
+  "star:Polaris": "Polaris",
+
+  "star:Denebola": "Denebola",
+  "star:Alpheratz": "Alpheratz",
+  "star:Scheat": "Scheat",
+  "star:Markab": "Markab",
+  "star:Algenib": "Algenib",
+
+  "star:Pleiades": "Pleiades",
+
+  "star:Dubhe": "Dubhe",
+  "star:Alioth": "Alioth",
+  "star:Alkaid": "Alkaid",
+
+  "asterism:SpringTriangle": "Spring Triangle",
+  "asterism:SummerTriangle": "Summer Triangle",
+  "asterism:WinterTriangle": "Winter Triangle",
+  "asterism:AutumnSquare": "Autumn Square",
+  "asterism:BigDipper": "Big Dipper",
+  "asterism:PleiadesGrp": "Pleiades"
 }

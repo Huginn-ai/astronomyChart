@@ -17,24 +17,59 @@
   "settings": "观测设定",
   "visibleStars": "当时可见的恒星",
   "visibleAsterisms": "可见的星群 / 星象",
-
   "place": "地点",
   "latitude": "纬度",
   "longitude": "经度",
   "time": "时间",
-
   "alt": "高度角 (°)",
   "az": "方位",
   "unit_degree": "°",
-
   "noStars": "此刻列表为空，可能是白天或目标在地平线下",
   "none": "无",
-
   "dir_N": "北",
   "dir_E": "东",
   "dir_S": "南",
   "dir_W": "西",
   "dir_of": "偏",
-  "dir_unknown": "未知"
+  "dir_unknown": "未知",
 
+  "star:Sirius": "天狼星",
+  "star:Vega": "织女一",
+  "star:Canopus": "老人星",
+  "star:Castor": "北河三",
+  "star:Pollux": "北河二",
+  "star:Capella": "五车二",
+  "star:Alpha_Cen": "南门二",
+  "star:Fomalhaut": "北落师门",
+  "star:Altair": "河鼓二",
+  "star:Deneb": "天津四",
+  "star:Antares": "心宿二",
+  "star:Betelgeuse": "参宿四",
+  "star:Alphard": "水委一",
+  "star:Aldebaran": "毕宿五",
+  "star:Spica": "角宿一",
+  "star:Rigel": "参宿七",
+  "star:Procyon": "南河三",
+  "star:Regulus": "轩辕十四",
+  "star:Arcturus": "大角",
+  "star:Polaris": "五帝座一",
+
+  "star:Denebola": "五帝座增一",
+  "star:Alpheratz": "角宿增一",
+  "star:Scheat": "壁宿二",
+  "star:Markab": "室宿一",
+  "star:Algenib": "室宿四",
+
+  "star:Pleiades": "昴星团",
+
+  "star:Dubhe": "北斗天枢",
+  "star:Alioth": "北斗玉衡",
+  "star:Alkaid": "北斗摇光",
+
+  "asterism:SpringTriangle": "春季大三角",
+  "asterism:SummerTriangle": "夏季大三角",
+  "asterism:WinterTriangle": "冬季大三角",
+  "asterism:AutumnSquare": "秋季四边形",
+  "asterism:BigDipper": "北斗七星",
+  "asterism:PleiadesGrp": "昴星团"
 }
