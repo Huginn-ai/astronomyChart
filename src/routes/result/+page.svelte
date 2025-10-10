@@ -79,6 +79,18 @@
     locale.set(next);
     await waitLocale();
   }
+
+  // 放在同文件 <script> 里
+  import { goto } from '$app/navigation';
+
+  function goBack() {
+    if (history.length > 1) {
+      history.back();
+    } else {
+      goto('/'); // 没有历史时回首页，避免无效
+    }
+  }
+
 </script>
 
 <main class="card">
@@ -118,6 +130,16 @@
       {#each visibleAsterisms as name}<li>{name}</li>{/each}
     </ul>
   {/if}
+
+
+  <!-- 你的表格和列表... -->
+
+  <div class="back-row">
+    <button type="button" class="btn btn-primary" on:click={goBack}>
+      {tr('back')}
+    </button>
+  </div>
+
 </main>
 
 <style>
@@ -125,4 +147,9 @@
   .table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
   th, td { padding: .6rem; text-align: center; border-bottom: 1px solid var(--border); }
   th { font-weight: 600; }
+  .back-row { margin-top: 1.25rem; display: flex; justify-content: flex-start; }
+
 </style>
+
+
+
