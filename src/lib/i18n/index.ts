@@ -33,7 +33,7 @@ init({
 
 // 浏览器端：持久化语言选择
 if (browser) {
-  locale.subscribe((value: string | undefined) => {
+  locale.subscribe((value) => {
     if (value) localStorage.setItem('lang', value);
   });
 }
