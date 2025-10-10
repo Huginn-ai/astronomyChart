@@ -4,6 +4,15 @@
   import { t, locale } from '$lib/i18n';
   import { get } from 'svelte/store';
 
+
+export async function toggleLang() {
+  const cur = get(locale) ?? 'en';
+  const next = cur.startsWith('zh') ? 'en' : 'zh';
+  locale.set(next);
+  await waitLocale();
+}
+
+
   // 默认 Princeton
   let city = "";
   let latitude = 40.343;
