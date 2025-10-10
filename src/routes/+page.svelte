@@ -7,12 +7,6 @@
 
 
 
-export async function toggleLang() {
-  const cur = get(locale) ?? 'en';
-  const next = cur.startsWith('zh') ? 'en' : 'zh';
-  locale.set(next);
-  await waitLocale();
-}
 
 
   // 默认 Princeton
