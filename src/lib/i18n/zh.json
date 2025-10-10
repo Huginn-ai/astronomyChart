@@ -12,5 +12,29 @@
   "submit_cta": "查看当晚可见目标",
   "lang_toggle": "English",
   "star_name": "星名",
-  "back": "返回"
+  "back": "返回",
+
+  "settings": "观测设定",
+  "visibleStars": "当时可见的恒星",
+  "visibleAsterisms": "可见的星群 / 星象",
+
+  "place": "地点",
+  "latitude": "纬度",
+  "longitude": "经度",
+  "time": "时间",
+
+  "alt": "高度角 (°)",
+  "az": "方位",
+  "unit_degree": "°",
+
+  "noStars": "此刻列表为空，可能是白天或目标在地平线下",
+  "none": "无",
+
+  "dir_N": "北",
+  "dir_E": "东",
+  "dir_S": "南",
+  "dir_W": "西",
+  "dir_of": "偏",
+  "dir_unknown": "未知"
+
 }

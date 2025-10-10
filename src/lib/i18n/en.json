@@ -12,5 +12,29 @@
   "submit_cta": "See tonight’s visible targets",
   "lang_toggle": "中文",
   "star_name": "Star",
-  "back": "Back"
+  "back": "Back",
+
+  "settings": "Observation settings",
+  "visibleStars": "Visible stars",
+  "visibleAsterisms": "Visible asterisms",
+
+  "place": "Location",
+  "latitude": "Latitude",
+  "longitude": "Longitude",
+  "time": "Time",
+
+  "alt": "Altitude (°)",
+  "az": "Azimuth",
+  "unit_degree": "°",
+
+  "noStars": "No targets right now — it may be daytime or below the horizon.",
+  "none": "None",
+
+  "dir_N": "N",
+  "dir_E": "E",
+  "dir_S": "S",
+  "dir_W": "W",
+  "dir_of": "of",
+  "dir_unknown": "Unknown"
+
 }

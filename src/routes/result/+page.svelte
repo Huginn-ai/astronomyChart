@@ -17,10 +17,10 @@
   let visibleAsterisms: string[] = [];
 
   function azToDirectionLocalized(azDeg: number, lang: string): string {
-    const dir =
-      lang.startsWith('zh')
-        ? { N: '北', E: '东', S: '南', W: '西', of: '偏' }
-        : { N: 'N',  E: 'E',  S: 'S',  W: 'W',  of: 'of' };
+    const dir = lang.startsWith('en')
+    ? { N: tr('dir_N'), E: tr('dir_E'), S: tr('dir_S'), W: tr('dir_W'), of: tr('dir_of'), unk: tr('dir_unknown') }
+    : { N: tr('dir_N'), E: tr('dir_E'), S: tr('dir_S'), W: tr('dir_W'), of: tr('dir_of'), unk: tr('dir_unknown') };
+
 
     const bases = [
       { base: 0,   name: dir.N },
@@ -98,11 +98,11 @@
     <button type="button" class="btn" on:click={toggleLang}>{tr('lang_toggle')}</button>
   </div>
 
-  <h2>🪐 {tr('settings')}</h2>
+  <h2> {tr('settings')}</h2>
   <p>{tr('place')}: {tr('latitude')} {lat.toFixed(3)}°, {tr('longitude')} {lon.toFixed(3)}°</p>
   <p>{tr('time')}: {timeStr}</p>
 
-  <h2>⭐ {tr('visibleStars')}</h2>
+  <h2> {tr('visibleStars')}</h2>
   {#if visibleStars.length === 0}
     <p>{tr('noStars')}</p>
   {:else}
@@ -132,7 +132,7 @@
   {/if}
 
 
-  <!-- 你的表格和列表... -->
+  <!-- 表格和列表... -->
 
   <div class="back-row">
     <button type="button" class="btn btn-primary" on:click={goBack}>
