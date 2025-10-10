@@ -44,6 +44,7 @@ cd astronomyChart
 
 # 3. Install dependencies
 npm install
+npm install svelte-i18n
 
 # 4. Run the development server
 npm run dev
