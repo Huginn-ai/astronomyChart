@@ -79,7 +79,7 @@
 
 <main class="card">
   <div class="lang-switch">
-  <button type="button" class="btn" on:click={toggleLang}>{$t('lang_toggle')}
+  <button type="button" class="btn" on:click={toggleLang}>{t('lang_toggle')}
 </button>
   </div>
 
