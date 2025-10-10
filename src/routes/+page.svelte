@@ -1,8 +1,10 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
   import { findCity } from '$lib/geo/cities';
-  import { t, locale } from '$lib/i18n';
+  import { locale, waitLocale } from '$lib/i18n';
   import { get } from 'svelte/store';
+
+
 
 
 export async function toggleLang() {
@@ -62,7 +64,8 @@ export async function toggleLang() {
 <main class="container">
   <div class="header">
     <h1>🌌 {$t('home_title')}</h1>
-    <button class="btn" on:click={toggleLang}>{$t('lang_toggle')}</button>
+    <button type="button" class="btn" on:click={toggleLang}>{$t('lang_toggle')}
+</button>
   </div>
 
   <form class="card" on:submit|preventDefault={submit}>

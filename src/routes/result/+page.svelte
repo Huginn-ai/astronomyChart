@@ -1,11 +1,11 @@
 <script lang="ts">
   import { page } from '$app/stores';
-  import { get } from 'svelte/store';
   import { STARS, ASTERISMS } from '$lib/stars/catalog';
   import { raDecToAltAz, isVisible } from '$lib/utils/astro';
 
   // i18n
-  import { t, locale } from '$lib/i18n';
+  import { locale, waitLocale } from '$lib/i18n';
+  import { get } from 'svelte/store';
 
   let lat = 0, lon = 0, timeStr = '';
   let visibleStars: { name: string; alt: number; az: number }[] = [];
@@ -79,7 +79,8 @@
 
 <main class="card">
   <div class="lang-switch">
-    <button class="btn" on:click={toggleLang}>{$t('lang_toggle')}</button>
+  <button type="button" class="btn" on:click={toggleLang}>{$t('lang_toggle')}
+</button>
   </div>
 
   <h2>🪐 {$t('settings')}</h2>
