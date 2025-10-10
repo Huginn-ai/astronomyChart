@@ -1,6 +1,6 @@
 # 🌠 Astronomy Chart
 
-A simple, interactive web app that shows which major stars and constellations are visible from a given **location** and **time**.  
+A simple, interactive web app that shows which first-magnitude stars are visible from a given **location** and **time**.  This is very friendly for beginner of astronomy to get familiar with the sky.
 Built with [SvelteKit](https://kit.svelte.dev/) and deployed on [Vercel](https://vercel.com).
 
 👉 **Live Demo:** [https://mr-sky.vercel.app/](https://mr-sky.vercel.app/)
