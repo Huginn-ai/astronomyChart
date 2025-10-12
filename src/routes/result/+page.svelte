@@ -24,6 +24,7 @@
     nameKey: string;  // e.g. "star:Vega"
     alt: number;
     az: number;
+    mag?: number | null; // 新增：星等
     // 用于缺失翻译的安全回退
     fallback: { cn: string; id: string };
   };
@@ -31,7 +32,7 @@
   let visibleStars: VisibleStar[] = [];
   let visibleAsterisms: string[] = [];        // e.g. ["asterism:SummerTriangle"]
 
-  // 渲染用的“已按当前语言排好序”的副本
+  // 渲染用的“已按当前语言/规则排好序”的副本
   let visibleStarsSorted: VisibleStar[] = [];
   let visibleAsterismsSorted: string[] = [];
 
@@ -65,6 +66,10 @@
     return lang.startsWith('zh') ? '未知' : 'Unknown';
   }
 
+  function fmtMag(m?: number | null): string {
+    return (typeof m === 'number' && isFinite(m)) ? m.toFixed(2) : '—';
+  }
+
   function compute() {
     const q = get(page).url.searchParams;
     lat = Number(q.get('lat') ?? 0);
@@ -82,10 +87,11 @@
 
       if (ok) {
         visibleStars.push({
-          nameKey: `star:${s.id}`,       // 统一用翻译键
+          nameKey: `star:${s.id}`, // 统一用翻译键
           alt: altDeg,
           az: azDeg,
-          fallback: { cn: s.cn, id: s.id }
+          mag: typeof (s as any).mag === 'number' ? (s as any).mag : null, // 带入星等
+          fallback: { cn: (s as any).cn, id: s.id }
         });
       }
     }
@@ -98,11 +104,14 @@
   // 初次计算（依赖于 URL 查询）
   $: compute();
 
-  // 任何时候可见列表或语言变动，都按当前语言译名进行排序
+  // 排序：按仰角从高到低，其次按当前语言名称
   $: {
     const lang = ($locale as string) ?? 'en';
 
     visibleStarsSorted = [...visibleStars].sort((a, b) => {
+      const byAlt = b.alt - a.alt; // desc：仰角越大越靠近天顶
+      if (byAlt !== 0) return byAlt;
+
       const an = tr(a.nameKey);
       const bn = tr(b.nameKey);
       return an.localeCompare(bn, lang, { sensitivity: 'base', numeric: true });
@@ -120,7 +129,7 @@
     const next = cur.startsWith('zh') ? 'en' : 'zh';
     locale.set(next);
     await waitLocale();
-    // 切换语言后，$: 排序块会自动触发，不需要手动再排
+    // 切换语言后，$: 排序块会自动触发
   }
 
   function goBack() {
@@ -160,6 +169,7 @@
           <th>{tr('star_name')}</th>
           <th>{tr('alt')}</th>
           <th>{tr('az')}</th>
+          <th>{tr('mag')}</th> <!-- 新增：星等 -->
         </tr>
       </thead>
       <tbody>
@@ -168,6 +178,7 @@
             <td>{displayWithFallbackStar(s, ($locale as string) ?? 'en')}</td>
             <td>{s.alt.toFixed(1)}</td>
             <td>{azToDirectionLocalized(s.az, (($locale as string) ?? 'en'))}</td>
+            <td>{fmtMag(s.mag)}</td>
           </tr>
         {/each}
       </tbody>
