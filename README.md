@@ -69,14 +69,14 @@ astronomyChart/
 
 ## 🌙 Future Improvements
 
-1. 📍 Display precise **positions** for each star and constellation  
+1. 📍 Display precise **positions** for each star and constellation  ✅finished on 10.10.2025
    (e.g. *15° west of north, 45° above the horizon*)  
-2. 🌐 Add **language selection** — switch between **English** and **中文**  
+2. 🌐 Add **language selection** — switch between **English** and **中文**  ✅finished on 10.10.2025
 3. 🌌 Expand and update the **star catalog** with more celestial objects  
 4. 🔗 Create **dedicated pages** for each star and constellation  
    — click a name to view detailed descriptions, visibility data, and mythology
-
-
+5. 🎨 **Beautify** the background of home page
+6. 📊 Write an **algorithm** to decide how easy can the target been seen, and range the targets in this order (from the easiest to the hardest)
 ---
 
 ## 🪐 Author
