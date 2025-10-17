@@ -72,5 +72,7 @@
   "asterism:WinterTriangle": "Winter Triangle",
   "asterism:AutumnSquare": "Autumn Square",
   "asterism:BigDipper": "Big Dipper",
-  "asterism:PleiadesGrp": "Pleiades"
+  "asterism:PleiadesGrp": "Pleiades",
+
+  "skyMap": "Sky Map"
 }

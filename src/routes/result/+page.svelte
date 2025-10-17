@@ -7,6 +7,8 @@
   import { t, locale, waitLocale } from '$lib/i18n';
   import { onDestroy } from 'svelte';
   import { goto } from '$app/navigation';
+  import CelestialChart from '$lib/components/CelestialChart.svelte';
+
 
   // 本地翻译函数（从 i18n store 取出函数）
   let tr: (k: string) => string = (k) => k;
@@ -123,6 +125,7 @@
       return an.localeCompare(bn, lang, { sensitivity: 'base', numeric: true });
     });
   }
+  
 
   async function toggleLang() {
     const cur = get(locale) ?? 'en';
@@ -148,6 +151,24 @@
     }
     return label;
   }
+  // 用于 CelestialChart 的高亮数据
+  type Highlight = { ra: number; dec: number; label: string; mag?: number | null };
+  let highlights: Highlight[] = [];
+
+  $: highlights = visibleStarsSorted.map((s) => {
+    const star = STARS.find((x) => x.id === s.fallback.id);
+    if (!star) return null;
+    return {
+      ra: star.raDeg,
+      dec: star.decDeg,
+      label: displayWithFallbackStar(s, ($locale as string) ?? 'en'),
+      mag: s.mag ?? null
+    };
+  }).filter(Boolean) as Highlight[];
+
+  // 时间兜底，避免空字符串导致 Invalid Date
+  $: safeDate = timeStr ? new Date(timeStr) : new Date();
+
 </script>
 
 <main class="card">
@@ -158,6 +179,15 @@
   <h2>{tr('settings')}</h2>
   <p>{tr('place')}: {tr('latitude')} {lat.toFixed(3)}°, {tr('longitude')} {lon.toFixed(3)}°</p>
   <p>{tr('time')}: {timeStr}</p>
+
+  <h2>🗺️ {tr('skyMap')}</h2>
+  <CelestialChart
+    {lat}
+    {lon}
+    date={safeDate}
+    width={520}
+    highlights={highlights}
+  />
 
   <h2>{tr('visibleStars')}</h2>
   {#if visibleStarsSorted.length === 0}

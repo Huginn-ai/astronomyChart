@@ -72,5 +72,7 @@
   "asterism:WinterTriangle": "冬季大三角",
   "asterism:AutumnSquare": "秋季四边形",
   "asterism:BigDipper": "北斗七星",
-  "asterism:PleiadesGrp": "昴星团"
+  "asterism:PleiadesGrp": "昴星团",
+
+  "skyMap": "星空图"
 }
