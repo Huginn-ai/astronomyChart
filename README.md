@@ -77,6 +77,7 @@ astronomyChart/
    — click a name to view detailed descriptions, visibility data, and mythology
 5. 🎨 **Beautify** the background of home page
 6. 📊 Write an **algorithm** to decide how easy can the target been seen, and range the targets in this order (from the easiest to the hardest)
+7. 🗺️ Create a sky map for the celestial. ✅finished on 10.16.2025
 ---
 
 ## 🪐 Author
