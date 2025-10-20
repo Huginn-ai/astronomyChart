@@ -74,5 +74,13 @@
   "asterism:BigDipper": "北斗七星",
   "asterism:PleiadesGrp": "昴星团",
 
-  "skyMap": "星空图"
+  "skyMap": "星空图",
+
+  "name_mode": {
+    "switch": "名称风格",
+    "popular": "常用名",
+    "both": "常用名 + 宿名",
+    "mansion": "二十八宿名"
+  }
+
 }

@@ -74,5 +74,12 @@
   "asterism:BigDipper": "Big Dipper",
   "asterism:PleiadesGrp": "Pleiades",
 
-  "skyMap": "Sky Map"
+  "skyMap": "Sky Map",
+
+  "name_mode": {
+    "switch": "Name style",
+    "popular": "Popular",
+    "both": "Popular + Mansion",
+    "mansion": "Mansion (28 Lodges)"
+  }
 }

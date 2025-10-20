@@ -2,18 +2,33 @@
   <link rel="stylesheet" href="/vendor/celestial/celestial.css" />
 </svelte:head>
 
-<!-- 注意：这里必须是普通容器，不要用 <canvas> -->
-<div id="celestial-map" style="width:520px;height:520px;background:#0a0e17;border:1px solid #444"></div>
+<!-- 外层用于设定最大宽度；内层是 Celestial 的容器 -->
+<div
+  class="celestial-wrap"
+  style={`--celestial-max:${width > 0 ? width + 'px' : '640px'}`}
+  bind:this={host}
+>
+  <!-- 注意：必须是普通容器，不是 <canvas> -->
+  <div id={cid} class="celestial-box"></div>
+</div>
 
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
 
   export type Highlight = { ra: number; dec: number; label: string; mag?: number | null };
   export let lat = 0;
   export let lon = 0;
   export let date: Date = new Date();
-  export let width = 520;
+
+  /** 最大宽度上限（px）。设 0 表示 640 的默认上限 */
+  export let width = 0;
+
   export let highlights: Highlight[] = [];
+
+  const cid = 'celestial-map';
+  let host!: HTMLDivElement;
+  let ro: ResizeObserver | null = null;
+  let raf = 0;
 
   function loadScript(src: string) {
     return new Promise<void>((resolve, reject) => {
@@ -37,47 +52,45 @@
     };
   }
 
+  // 防抖：容器尺寸变化时重绘
+  function doResize() {
+    cancelAnimationFrame(raf);
+    raf = requestAnimationFrame(() => {
+      // 0 = 让库按父容器宽度自适应
+      // @ts-ignore
+      window.Celestial?.resize(0);
+    });
+  }
+
   onMount(async () => {
     try {
       await loadScript('/vendor/celestial/d3.v3.min.js');
       await loadScript('/vendor/celestial/celestial.min.js');
       const Celestial = (window as any).Celestial;
-      console.log('[Celestial] lib loaded:', !!Celestial);
 
       if (isNaN(date.getTime())) date = new Date();
 
-      // ！！关键：projection 必须是 'stereographic'（不是 'stereo'）
-      // container 传 id 字符串，不带 '#'
+      // 关键：width: 0 → 使用父容器宽度（由 .celestial-box 决定）
       Celestial.display({
-        container: 'celestial-map',
+        container: cid,                  // 不带 '#'
         datapath: '/vendor/celestial/data/',
-        projection: 'stereographic',
-        width,
+        projection: 'stereographic',     // 注意不是 'stereo'
+        width: 0,                        // 响应式：按父容器宽度
         transform: 'equatorial',
-        stars: { show: true, limit: 6, colors: true, names: true },
-        constellations: { show: true, lines: true, names: true, boundaries: false },
-        horizon: { show: true },
+        stars: { show: false, limit: 6, colors: true, names: true },
+        constellations: { show: false, lines: true, names: true, boundaries: false },
+        horizon: { show: false },
         geopos: [lat, lon],
         date
       });
 
-      // 画布是否生成（canvas 或 svg 二选一）
-      const child = document.querySelector('#celestial-map canvas, #celestial-map svg');
-      console.log('[Celestial] child present?', !!child, child);
-
-      // 简单的可视化“测试点”（就算星表没加载也能看到一个点）
+      // 诊断点（可保留/删除）
       Celestial.add({
         type: 'FeatureCollection',
-        features: [
-          {
-            type: 'Feature',
-            properties: { name: 'TEST • RA0° Dec0°' },
-            geometry: { type: 'Point', coordinates: [0, 0] }
-          }
-        ]
+        features: [{ type: 'Feature', properties: { name: 'TEST • RA0° Dec0°' }, geometry: { type: 'Point', coordinates: [0, 0] } }]
       }, { id: 'diagnostic-point', type: 'point', size: 4, color: '#00ffff', names: true });
 
-      // 你的高亮层
+      // 高亮层
       Celestial.add(toGeoJSONPoints(highlights), {
         id: 'visible-highlights',
         type: 'point',
@@ -89,22 +102,31 @@
       });
 
       Celestial.redraw?.();
-      console.log('[Celestial] redraw done');
+
+      // 监听父容器尺寸变化（布局/列宽/侧栏变化等都会触发）
+      ro = new ResizeObserver(doResize);
+      ro.observe(host); // 也可以 observe document.getElementById(cid)!
+      window.addEventListener('resize', doResize);
+      window.addEventListener('orientationchange', doResize);
     } catch (e) {
       console.error('[Celestial] init error', e);
     }
   });
 
-  // 可选：当外部 props 变化时，刷新地点/时间与高亮
+  onDestroy(() => {
+    ro?.disconnect();
+    window.removeEventListener('resize', doResize);
+    window.removeEventListener('orientationchange', doResize);
+  });
+
+  // 外部 props 变化时刷新地点/时间与高亮（不重复 display）
   $: (async () => {
     const Celestial = (typeof window !== 'undefined') && (window as any).Celestial;
     if (!Celestial) return;
 
     try {
-      // 更新视图（H()里挂的 API）
       Celestial.skyview?.({ location: [lat, lon], date });
 
-      // 重绘高亮
       Celestial.remove?.('visible-highlights');
       Celestial.add(toGeoJSONPoints(highlights), {
         id: 'visible-highlights',
@@ -124,9 +146,23 @@
 </script>
 
 <style>
-  /* 让库插入的 canvas/svg 自适应容器大小 */
-  #celestial-map > canvas,
-  #celestial-map > svg {
+  /* 外层：限制最大宽度；你也可在页面栅格里控制 */
+  .celestial-wrap {
+    width: 100%;
+    max-width: var(--celestial-max, 640px);
+  }
+
+  /* 关键：让容器成为自适应的正方形（高度随宽度变） */
+  .celestial-box {
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    background: #0a0e17;
+    border: 1px solid #444;
+  }
+
+  /* 让库插入的 canvas/svg 占满容器 —— 全局选择器 */
+  :global(#celestial-map > canvas),
+  :global(#celestial-map > svg) {
     width: 100% !important;
     height: 100% !important;
     display: block;

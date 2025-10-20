@@ -14,9 +14,15 @@
   let city = "";
   let latitude = 40.343;
   let longitude = -74.651;
-  let datetime = new Date().toISOString().slice(0, 16);
+  let datetime = toLocalDatetimeValue();
 
   let cityMsg: string | null = null;
+
+  function toLocalDatetimeValue(d: Date = new Date()) {
+  const tz = d.getTimezoneOffset();           // 本地相对 UTC 的分钟数
+  const local = new Date(d.getTime() - tz * 60000);
+  return local.toISOString().slice(0, 16);    // "YYYY-MM-DDTHH:mm"
+}
 
   function useCity() {
     cityMsg = null;
