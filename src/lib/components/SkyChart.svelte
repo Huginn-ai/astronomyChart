@@ -1,320 +1,415 @@
 <script lang="ts">
-  import { onMount, onDestroy } from 'svelte';
+	import { onMount } from 'svelte';
+	import { normalizeDegrees } from '$lib/utils/astro';
+	import { formatDirection, type Language } from '$lib/utils/observing';
+	import type { Asterism } from '../../types/Stars';
 
-  export type VisibleStar = {
-    id: string;        // 英文名
-    cn?: string;       // 中文名（可选）
-    alt: number;       // 度
-    az: number;        // 度，0=北，顺时针
-    mag?: number;      // 星等（可选）
-  };
-  export type Asterism = { id: string; members: string[] };
+	type Point = {
+		id: string;
+		cn?: string;
+		label?: string;
+		alt: number;
+		az: number;
+		mag?: number;
+		kind?: 'star' | 'cluster';
+	};
+	type Props = {
+		stars?: Point[];
+		asterisms?: Asterism[];
+		locale?: Language;
+		minAlt?: number;
+		showGrid?: boolean;
+		showLabels?: boolean;
+		showPatterns?: boolean;
+		labelMagLimit?: number;
+		rotationDeg?: number;
+		interactive?: boolean;
+		selectedId?: string | null;
+		onselect?: (id: string | null) => void;
+	};
+	let {
+		stars = [],
+		asterisms = [],
+		locale = 'en',
+		minAlt = 0,
+		showGrid = true,
+		showLabels = true,
+		showPatterns = true,
+		labelMagLimit = 2.5,
+		rotationDeg = $bindable(0),
+		interactive = true,
+		selectedId = null,
+		onselect
+	}: Props = $props();
+	let container: HTMLDivElement;
+	let canvas: HTMLCanvasElement;
+	let frame = 0;
+	let dragging = false;
+	let moved = false;
+	let startAngle = 0;
+	let startRotation = 0;
+	let startX = 0;
+	let startY = 0;
+	let disk: { cx: number; cy: number; radius: number; size: number } | null = null;
+	let hitPoints: { id: string; x: number; y: number }[] = [];
 
-  export let stars: VisibleStar[] = [];
-  export let asterisms: Asterism[] = [];
-  export let minAlt = 0;
-  export let showGrid = true;
-  export let locale: 'en' | 'zh' = 'en';
+	const label = (star: Point) => star.label || (locale === 'zh' ? star.cn : star.id) || star.id;
+	const radiusFor = (mag = 2) => Math.max(1.6, Math.min(4.6, 3.7 - mag * 0.52));
+	function xy(az: number, alt: number) {
+		if (!disk) return [0, 0];
+		const angle = ((az + rotationDeg) * Math.PI) / 180;
+		const r = ((90 - alt) / 90) * disk.radius;
+		return [disk.cx - r * Math.sin(angle), disk.cy - r * Math.cos(angle)];
+	}
+	type Box = { left: number; top: number; right: number; bottom: number };
+	const overlaps = (a: Box, b: Box) =>
+		!(a.right < b.left || a.left > b.right || a.bottom < b.top || a.top > b.bottom);
 
-  // —— 标签参数 ——
-  export let showLabels = true;
-  export let labelMagLimit = 1.6;     // 显示到 ~一等星（调大显示更多）
-  export let labelFontPx = 12;
-  export let labelHalo = true;
+	function scheduleDraw() {
+		cancelAnimationFrame(frame);
+		frame = requestAnimationFrame(draw);
+	}
 
-  // —— 旋转参数 ——
-  export let rotationDeg = 0;         // 可外部传入 / 绑定
-  export let interactiveRotate = true;
-  export let wheelRotate = true;
+	function draw() {
+		if (!canvas || !container) return;
+		const size = container.clientWidth;
+		if (size < 1) return;
+		const dpr = Math.min(window.devicePixelRatio || 1, 3);
+		const pixels = Math.round(size * dpr);
+		if (canvas.width !== pixels || canvas.height !== pixels) {
+			canvas.width = pixels;
+			canvas.height = pixels;
+		}
+		const ctx = canvas.getContext('2d');
+		if (!ctx) return;
+		ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+		ctx.clearRect(0, 0, size, size);
+		const style = getComputedStyle(document.documentElement);
+		const color = (name: string) => style.getPropertyValue(name).trim();
+		const starColor = color('--star'),
+			lineColor = color('--chart-line'),
+			accent = color('--accent'),
+			muted = color('--muted');
+		disk = { size, cx: size / 2, cy: size / 2, radius: size / 2 - (size < 350 ? 32 : 40) };
+		const { cx, cy, radius } = disk;
+		ctx.beginPath();
+		ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+		ctx.fillStyle = color('--chart-bg');
+		ctx.fill();
+		ctx.strokeStyle = lineColor;
+		ctx.globalAlpha = 0.6;
+		ctx.lineWidth = 1;
+		ctx.stroke();
+		ctx.globalAlpha = 1;
 
-  let container: HTMLDivElement;
-  let canvas: HTMLCanvasElement;
-  let ro: ResizeObserver;
-  let dpr = 1;
+		// A thin outer compass ring and cardinal ticks.
+		ctx.strokeStyle = lineColor;
+		ctx.globalAlpha = 0.4;
+		ctx.beginPath();
+		ctx.arc(cx, cy, radius + 6, 0, Math.PI * 2);
+		ctx.stroke();
+		for (let az = 0; az < 360; az += 10) {
+			const theta = ((az + rotationDeg) * Math.PI) / 180;
+			const r1 = radius + 6,
+				r2 = radius + (az % 90 === 0 ? 12 : 9);
+			ctx.beginPath();
+			ctx.moveTo(cx - r1 * Math.sin(theta), cy - r1 * Math.cos(theta));
+			ctx.lineTo(cx - r2 * Math.sin(theta), cy - r2 * Math.cos(theta));
+			ctx.stroke();
+		}
+		ctx.globalAlpha = 1;
+		ctx.save();
+		ctx.beginPath();
+		ctx.arc(cx, cy, radius - 1, 0, Math.PI * 2);
+		ctx.clip();
 
-  // 拖拽状态
-  let dragging = false;
-  let startAngle = 0;     // 指针相对中心的起始角（弧度）
-  let startRotation = 0;  // 拖拽开始时的角度（度）
+		if (showGrid) {
+			ctx.strokeStyle = lineColor;
+			ctx.globalAlpha = 0.22;
+			ctx.lineWidth = 0.7;
+			for (const alt of [30, 60]) {
+				ctx.beginPath();
+				ctx.arc(cx, cy, ((90 - alt) / 90) * radius, 0, Math.PI * 2);
+				ctx.stroke();
+			}
+			ctx.setLineDash([2, 5]);
+			for (let az = 0; az < 360; az += 45) {
+				const [x, y] = xy(az, 0);
+				ctx.beginPath();
+				ctx.moveTo(cx, cy);
+				ctx.lineTo(x, y);
+				ctx.stroke();
+			}
+			ctx.setLineDash([]);
+			ctx.globalAlpha = 0.7;
+			ctx.font = '10px system-ui';
+			ctx.fillStyle = muted;
+			ctx.textAlign = 'left';
+			ctx.fillText('30°', cx + 5, cy - (radius * 2) / 3 + 12);
+			ctx.fillText('60°', cx + 5, cy - radius / 3 + 12);
+			ctx.globalAlpha = 1;
+		}
+		if (minAlt > 0) {
+			ctx.strokeStyle = accent;
+			ctx.globalAlpha = 0.28;
+			ctx.setLineDash([4, 5]);
+			ctx.beginPath();
+			ctx.arc(cx, cy, ((90 - minAlt) / 90) * radius, 0, Math.PI * 2);
+			ctx.stroke();
+			ctx.setLineDash([]);
+			ctx.globalAlpha = 1;
+		}
 
-  const PAD = 16;         // 与 draw() 内保持一致
+		const points = stars.filter(
+			(s) => Number.isFinite(s.alt) && Number.isFinite(s.az) && s.alt > minAlt && s.alt <= 90
+		);
+		const byId = new Map(points.map((s) => [s.id, s]));
+		if (showPatterns) {
+			ctx.strokeStyle = accent;
+			ctx.globalAlpha = 0.45;
+			ctx.lineWidth = 1;
+			for (const pattern of asterisms) {
+				if (!pattern.members.every((id) => byId.has(id))) continue;
+				const edges: [string, string][] =
+					pattern.edges ||
+					pattern.members.map((id, i) => [id, pattern.members[(i + 1) % pattern.members.length]]);
+				for (const [first, second] of edges) {
+					const a = byId.get(first),
+						b = byId.get(second);
+					if (!a || !b || first === second) continue;
+					const [x1, y1] = xy(a.az, a.alt),
+						[x2, y2] = xy(b.az, b.alt);
+					ctx.beginPath();
+					ctx.moveTo(x1, y1);
+					ctx.lineTo(x2, y2);
+					ctx.stroke();
+				}
+			}
+			ctx.globalAlpha = 1;
+		}
+		hitPoints = [];
+		for (const star of points) {
+			const [x, y] = xy(star.az, star.alt),
+				r = radiusFor(star.mag);
+			hitPoints.push({ id: star.id, x, y });
+			if (star.id === selectedId) {
+				ctx.strokeStyle = accent;
+				ctx.lineWidth = 1.5;
+				ctx.beginPath();
+				ctx.arc(x, y, r + 7, 0, Math.PI * 2);
+				ctx.stroke();
+			}
+			ctx.fillStyle = star.id === selectedId ? accent : starColor;
+			if (star.kind === 'cluster') {
+				ctx.beginPath();
+				ctx.arc(x, y, 5, 0, Math.PI * 2);
+				ctx.strokeStyle = accent;
+				ctx.lineWidth = 1;
+				ctx.stroke();
+				ctx.beginPath();
+				ctx.arc(x, y, 1.5, 0, Math.PI * 2);
+				ctx.fill();
+			} else {
+				ctx.shadowColor = starColor;
+				ctx.shadowBlur = star.mag !== undefined && star.mag < 1 ? 8 : 0;
+				ctx.beginPath();
+				ctx.arc(x, y, r, 0, Math.PI * 2);
+				ctx.fill();
+				ctx.shadowBlur = 0;
+			}
+		}
 
-  const normDeg = (a: number) => {
-    let d = a % 360;
-    if (d < 0) d += 360;
-    return d;
-  };
+		if (showLabels) {
+			const font = size < 360 ? 10 : 11;
+			ctx.font = `${font}px system-ui`;
+			ctx.textBaseline = 'middle';
+			const boxes: Box[] = [];
+			const candidates = [...points]
+				.filter(
+					(s) =>
+						s.id === selectedId ||
+						s.mag === undefined ||
+						s.mag <= labelMagLimit ||
+						s.kind === 'cluster'
+				)
+				.sort(
+					(a, b) =>
+						Number(b.id === selectedId) - Number(a.id === selectedId) || (a.mag ?? 5) - (b.mag ?? 5)
+				);
+			for (const star of candidates) {
+				const text = label(star),
+					width = ctx.measureText(text).width;
+				const [x, y] = xy(star.az, star.alt);
+				const anchors = [
+					[8, -9],
+					[-width - 8, -9],
+					[8, 10],
+					[-width - 8, 10]
+				];
+				for (const [dx, dy] of anchors) {
+					const tx = x + dx,
+						ty = y + dy;
+					const box = {
+						left: tx - 2,
+						right: tx + width + 2,
+						top: ty - font / 2 - 2,
+						bottom: ty + font / 2 + 2
+					};
+					const inside = [
+						[box.left, box.top],
+						[box.right, box.top],
+						[box.left, box.bottom],
+						[box.right, box.bottom]
+					].every(([px, py]) => Math.hypot(px - cx, py - cy) < radius - 2);
+					if (!inside || boxes.some((b) => overlaps(box, b))) continue;
+					boxes.push(box);
+					ctx.textAlign = 'left';
+					ctx.lineWidth = 4;
+					ctx.strokeStyle = color('--chart-bg');
+					ctx.strokeText(text, tx, ty);
+					ctx.fillStyle = star.id === selectedId ? accent : starColor;
+					ctx.fillText(text, tx, ty);
+					break;
+				}
+			}
+		}
+		ctx.restore();
+		ctx.textAlign = 'center';
+		ctx.textBaseline = 'middle';
+		ctx.font = '11px system-ui';
+		const directions = locale === 'zh' ? ['北', '东', '南', '西'] : ['N', 'E', 'S', 'W'];
+		directions.forEach((text, i) => {
+			const theta = ((i * 90 + rotationDeg) * Math.PI) / 180,
+				r = radius + 23;
+			ctx.fillStyle = i === 0 ? accent : muted;
+			ctx.fillText(text, cx - r * Math.sin(theta), cy - r * Math.cos(theta));
+		});
+	}
 
-  function magToPx(m?: number) {
-    if (m == null) return 1.5;
-    const px = 3.2 - 0.55 * m;
-    return Math.max(0.8, Math.min(px, 4.8));
-  }
+	function pointer(e: PointerEvent) {
+		const rect = canvas.getBoundingClientRect();
+		return {
+			x: ((e.clientX - rect.left) * (disk?.size || rect.width)) / rect.width,
+			y: ((e.clientY - rect.top) * (disk?.size || rect.width)) / rect.width
+		};
+	}
+	function down(e: PointerEvent) {
+		if (!interactive || !disk || e.button !== 0) return;
+		const { x, y } = pointer(e);
+		if (Math.hypot(x - disk.cx, y - disk.cy) > disk.radius) return;
+		dragging = true;
+		moved = false;
+		startX = x;
+		startY = y;
+		startAngle = Math.atan2(y - disk.cy, x - disk.cx);
+		startRotation = rotationDeg;
+		canvas.setPointerCapture(e.pointerId);
+	}
+	function move(e: PointerEvent) {
+		if (!dragging || !disk) return;
+		const { x, y } = pointer(e);
+		if (Math.hypot(x - startX, y - startY) > 5) moved = true;
+		if (moved)
+			rotationDeg = normalizeDegrees(
+				startRotation - ((Math.atan2(y - disk.cy, x - disk.cx) - startAngle) * 180) / Math.PI
+			);
+	}
+	function up(e: PointerEvent) {
+		if (!dragging) return;
+		dragging = false;
+		if (canvas.hasPointerCapture(e.pointerId)) canvas.releasePointerCapture(e.pointerId);
+		if (!moved) {
+			const { x, y } = pointer(e);
+			const closest = [...hitPoints].sort(
+				(a, b) => Math.hypot(a.x - x, a.y - y) - Math.hypot(b.x - x, b.y - y)
+			)[0];
+			if (closest && Math.hypot(closest.x - x, closest.y - y) < 18) onselect?.(closest.id);
+		}
+	}
+	function cancel() {
+		dragging = false;
+	}
+	function key(e: KeyboardEvent) {
+		if (!interactive) return;
+		if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+			e.preventDefault();
+			rotationDeg = normalizeDegrees(rotationDeg + (e.key === 'ArrowLeft' ? 5 : -5));
+		}
+		if (e.key === 'Home') {
+			e.preventDefault();
+			rotationDeg = 0;
+		}
+		if (e.key === 'Escape') onselect?.(null);
+	}
 
-  // 东在左：x = cx - r*sin(az)，y = cy - r*cos(az)
-  // 这里把 rotationDeg 加进 az，实现“圆内全部一起转”，标签仍保持水平
-  function azAltToXY(azDeg: number, altDeg: number, cx: number, cy: number, R: number) {
-    const θ = ((azDeg + rotationDeg) * Math.PI) / 180;
-    const r = ((90 - altDeg) / 90) * R;
-    return [cx - r * Math.sin(θ), cy - r * Math.cos(θ)];
-  }
-
-  function getLabel(s: VisibleStar) {
-    return locale === 'zh' && s.cn ? s.cn : s.id;
-  }
-
-  // 简易矩形碰撞
-  type Box = { x1: number; y1: number; x2: number; y2: number };
-  const overlap = (a: Box, b: Box) => !(a.x2 < b.x1 || a.x1 > b.x2 || a.y2 < b.y1 || a.y1 > b.y2);
-
-  function draw() {
-    if (!canvas || !container) return;
-    const cssSize = container.clientWidth || 512;
-    const w = Math.floor(cssSize * dpr);
-    const h = w;
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    canvas.width = w; canvas.height = h;
-    canvas.style.width = cssSize + 'px';
-    canvas.style.height = cssSize + 'px';
-
-    const vars = getComputedStyle(document.documentElement);
-    const bg = vars.getPropertyValue('--bg').trim() || '#0b0f16';
-    const ring = vars.getPropertyValue('--border').trim() || '#9aa4b0';
-
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.clearRect(0, 0, w / dpr, h / dpr);
-
-    const cx = (w / dpr) / 2;
-    const cy = (h / dpr) / 2;
-    const R = Math.min(cx, cy) - PAD;
-
-    // 背景圆
-    ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2);
-    ctx.fillStyle = bg; ctx.fill();
-
-    // 外圈
-    ctx.lineWidth = 3; ctx.strokeStyle = ring;
-    ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.stroke();
-
-    // 圆内裁剪
-    ctx.save();
-    ctx.beginPath(); ctx.arc(cx, cy, R - 1, 0, Math.PI * 2); ctx.clip();
-
-    // 网格（方位辐射线随 rotationDeg 旋转）
-    if (showGrid) {
-      ctx.strokeStyle = 'rgba(255,255,255,0.12)';
-      ctx.lineWidth = 1;
-
-      // 高度圈
-      for (const alt of [0, 30, 60]) {
-        const r = ((90 - alt) / 90) * R;
-        ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke();
-      }
-      // 方位射线
-      for (let az = 0; az < 360; az += 30) {
-        const [x1, y1] = azAltToXY(az, 0, cx, cy, R);
-        const [x2, y2] = azAltToXY(az, 89.9, cx, cy, R);
-        ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
-      }
-    }
-
-    // 连线
-    if (asterisms?.length) {
-      const map = new Map(stars.map((s) => [s.id, s]));
-      ctx.strokeStyle = 'rgba(255,255,255,0.4)';
-      ctx.lineWidth = 1.4;
-      for (const ast of asterisms) {
-        const pts = ast.members.map((id) => map.get(id)).filter(Boolean) as VisibleStar[];
-        if (pts.length >= 2 && pts.every((p) => p.alt >= minAlt)) {
-          ctx.beginPath();
-          pts.forEach((s, i) => {
-            const [x, y] = azAltToXY(s.az, s.alt, cx, cy, R);
-            if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-          });
-          ctx.stroke();
-        }
-      }
-    }
-
-    // 星点
-    ctx.fillStyle = '#fff';
-    for (const s of stars) {
-      if (s.alt < minAlt) continue;
-      const [x, y] = azAltToXY(s.az, s.alt, cx, cy, R);
-      const r = magToPx(s.mag);
-      ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
-    }
-
-    // 标签（保持水平不随旋转倾斜）
-    if (showLabels) {
-      ctx.font = `${labelFontPx}px system-ui, ui-sans-serif`;
-      ctx.textBaseline = 'middle';
-      ctx.fillStyle = '#fff';
-
-      const placed: Box[] = [];
-      const padText = 6;
-      const lineH = labelFontPx * 1.2;
-
-      const labelCandidates = stars
-        .filter((s) => s.alt >= minAlt)
-        .filter((s) => typeof s.mag !== 'number' || s.mag <= labelMagLimit)
-        .sort((a, b) => {
-          const am = (typeof a.mag === 'number') ? a.mag : 9;
-          const bm = (typeof b.mag === 'number') ? b.mag : 9;
-          return am - bm; // 亮的先放
-        });
-
-      for (const s of labelCandidates) {
-        const text = getLabel(s);
-        const [x, y] = azAltToXY(s.az, s.alt, cx, cy, R);
-        const wText = ctx.measureText(text).width;
-        const hText = lineH;
-
-        const outwardX = Math.sign(x - cx) || 1;
-        const outwardY = Math.sign(y - cy) || 1;
-
-        const anchors: Array<{ tx: number; ty: number; align: CanvasTextAlign; box: Box }> = [];
-
-        // 径向外侧优先
-        {
-          const tx = x + outwardX * padText;
-          const ty = y + outwardY * padText;
-          const align: CanvasTextAlign = outwardX >= 0 ? 'left' : 'right';
-          const left = align === 'left' ? tx : tx - wText;
-          anchors.push({ tx, ty, align, box: { x1: left, y1: ty - hText / 2, x2: left + wText, y2: ty + hText / 2 }});
-        }
-        // 其它兜底
-        const candidates = [
-          { ax:  1, ay: -1, align: 'left'  as const },
-          { ax: -1, ay:  1, align: 'right' as const },
-          { ax: -1, ay: -1, align: 'right' as const },
-        ];
-        for (const c of candidates) {
-          const tx = x + c.ax * padText;
-          const ty = y + c.ay * padText;
-          const left = c.align === 'left' ? tx : tx - wText;
-          anchors.push({ tx, ty, align: c.align, box: { x1: left, y1: ty - hText / 2, x2: left + wText, y2: ty + hText / 2 }});
-        }
-
-        let placedAnchor = anchors.find(a => placed.every(b => !overlap(a.box, b)));
-        if (!placedAnchor) continue;
-
-        placed.push(placedAnchor.box);
-        ctx.textAlign = placedAnchor.align;
-
-        if (labelHalo) {
-          ctx.lineWidth = 3;
-          ctx.strokeStyle = 'rgba(0,0,0,0.55)';
-          ctx.strokeText(text, placedAnchor.tx, placedAnchor.ty);
-        }
-        ctx.fillText(text, placedAnchor.tx, placedAnchor.ty);
-      }
-    }
-
-    // 退出裁剪
-    ctx.restore();
-
-    // —— 外侧方位文字（随 rotationDeg 旋转；文字保持水平） ——
-
-  const labels = locale === 'zh'
-    ? [{txt:'北', az:0},{txt:'东', az:90},{txt:'南', az:180},{txt:'西', az:270}]
-    : [{txt:'North', az:0},{txt:'East', az:90},{txt:'South', az:180},{txt:'West', az:270}];
-
-  const margin = 14; // 圆外偏移，按需要调
-  ctx.fillStyle = '#fff';
-  ctx.font = '14px system-ui, ui-sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-
-  for (const { txt, az } of labels) {
-    const theta = (az + rotationDeg) * Math.PI / 180; // 跟随旋转
-    const rr = R + margin;
-    const x = cx - rr * Math.sin(theta); // 东在左：x = cx - r*sin(az)
-    const y = cy - rr * Math.cos(theta); // y = cy - r*cos(az)
-    ctx.fillText(txt, x, y);
-  }
-}
-
-
-  // 交互：拖拽旋转
-  function angleFromEvent(e: PointerEvent) {
-    const rect = canvas.getBoundingClientRect();
-    const cx = rect.left + rect.width / 2;
-    const cy = rect.top + rect.height / 2;
-    const dx = e.clientX - cx;
-    const dy = e.clientY - cy;
-    return Math.atan2(dy, dx); // 相对屏幕 x 轴
-  }
-
-  function withinDisk(e: PointerEvent) {
-    const rect = canvas.getBoundingClientRect();
-    const cx = rect.left + rect.width / 2;
-    const cy = rect.top + rect.height / 2;
-    const dx = e.clientX - cx;
-    const dy = e.clientY - cy;
-    const Rcss = Math.min(rect.width, rect.height) / 2 - PAD;
-    return Math.hypot(dx, dy) <= Rcss + 6;
-  }
-
-  function onPointerDown(e: PointerEvent) {
-    if (!interactiveRotate) return;
-    if (!withinDisk(e)) return;
-    dragging = true;
-    startAngle = angleFromEvent(e);
-    startRotation = rotationDeg;
-    canvas.setPointerCapture(e.pointerId);
-    (canvas.style as any).cursor = 'grabbing';
-    e.preventDefault();
-  }
-  function onPointerMove(e: PointerEvent) {
-    if (!dragging) return;
-    const a = angleFromEvent(e);
-    const deltaDeg = (a - startAngle) * (180 / Math.PI);
-    rotationDeg = normDeg(startRotation + deltaDeg);
-  }
-  function onPointerUp(e: PointerEvent) {
-    if (!dragging) return;
-    dragging = false;
-    try { canvas.releasePointerCapture(e.pointerId); } catch {}
-    (canvas.style as any).cursor = 'grab';
-  }
-
-  function onWheel(e: WheelEvent) {
-    if (!wheelRotate) return;
-    // 正负方向按你的直觉调整
-    rotationDeg = normDeg(rotationDeg + e.deltaY * 0.05);
-    e.preventDefault();
-  }
-
-  onMount(() => {
-    dpr = window.devicePixelRatio || 1;
-    ro = new ResizeObserver(() => draw());
-    ro.observe(container);
-    (canvas.style as any).cursor = interactiveRotate ? 'grab' : 'default';
-    draw();
-  });
-
-  $: stars, asterisms, showGrid, locale, minAlt, showLabels, labelMagLimit, labelFontPx, labelHalo, rotationDeg, draw();
-
-  onDestroy(() => ro?.disconnect());
+	$effect(() => {
+		void [
+			stars,
+			asterisms,
+			locale,
+			minAlt,
+			showGrid,
+			showLabels,
+			showPatterns,
+			labelMagLimit,
+			rotationDeg,
+			selectedId
+		];
+		scheduleDraw();
+		return () => cancelAnimationFrame(frame);
+	});
+	onMount(() => {
+		const resize = new ResizeObserver(scheduleDraw);
+		resize.observe(container);
+		const theme = new MutationObserver(scheduleDraw);
+		theme.observe(document.documentElement, { attributes: true, attributeFilter: ['data-night'] });
+		window.addEventListener('resize', scheduleDraw);
+		scheduleDraw();
+		return () => {
+			resize.disconnect();
+			theme.disconnect();
+			cancelAnimationFrame(frame);
+			window.removeEventListener('resize', scheduleDraw);
+		};
+	});
 </script>
 
 <div bind:this={container} class="chart-wrap">
-  <canvas
-    bind:this={canvas}
-    aria-label="sky chart"
-    on:pointerdown={onPointerDown}
-    on:pointermove={onPointerMove}
-    on:pointerup={onPointerUp}
-    on:pointercancel={onPointerUp}
-    on:wheel={onWheel}
-  ></canvas>
+	<canvas
+		bind:this={canvas}
+		class:interactive
+		tabindex={interactive ? 0 : -1}
+		aria-label={locale === 'zh'
+			? '星图：左右方向键旋转，Home 重置。在目标列表中选择星星。'
+			: 'Sky map: arrow keys rotate, Home resets. Select stars in the target list.'}
+		onpointerdown={down}
+		onpointermove={move}
+		onpointerup={up}
+		onpointercancel={cancel}
+		onkeydown={key}
+	>
+		{#each stars as star (star.id)}<span
+				>{label(star)} · {star.alt.toFixed(1)}° · {formatDirection(star.az, locale)}</span
+			>{/each}
+	</canvas>
 </div>
 
 <style>
-  .chart-wrap { width: 100%; max-width: 640px; aspect-ratio: 1 / 1; }
-  canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+	.chart-wrap {
+		width: 100%;
+		aspect-ratio: 1;
+	}
+	canvas {
+		display: block;
+		width: 100%;
+		height: 100%;
+		border-radius: 12px;
+	}
+	canvas.interactive {
+		cursor: grab;
+		touch-action: none;
+	}
+	canvas.interactive:active {
+		cursor: grabbing;
+	}
 </style>

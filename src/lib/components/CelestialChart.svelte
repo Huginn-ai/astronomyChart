@@ -1,170 +1,160 @@
-<svelte:head>
-  <link rel="stylesheet" href="/vendor/celestial/celestial.css" />
-</svelte:head>
-
-<!-- 外层用于设定最大宽度；内层是 Celestial 的容器 -->
-<div
-  class="celestial-wrap"
-  style={`--celestial-max:${width > 0 ? width + 'px' : '640px'}`}
-  bind:this={host}
->
-  <!-- 注意：必须是普通容器，不是 <canvas> -->
-  <div id={cid} class="celestial-box"></div>
-</div>
-
 <script lang="ts">
-  import { onMount, onDestroy } from 'svelte';
+	import { onMount } from 'svelte';
+	import { createI18n } from '$lib/i18n/reactive.svelte';
+	import { lstInDegrees } from '$lib/utils/astro';
+	import { loadCelestial, celestialApi, type Highlight } from '$lib/utils/celestial';
+	let {
+		lat = 0,
+		lon = 0,
+		date,
+		highlights = []
+	}: { lat?: number; lon?: number; date: Date; highlights?: Highlight[] } = $props();
+	const i18n = createI18n();
+	let host: HTMLDivElement;
+	let ready = $state(false);
+	let failed = $state(false);
+	let frame = 0;
 
-  export type Highlight = { ra: number; dec: number; label: string; mag?: number | null };
-  export let lat = 0;
-  export let lon = 0;
-  export let date: Date = new Date();
-
-  /** 最大宽度上限（px）。设 0 表示 640 的默认上限 */
-  export let width = 0;
-
-  export let highlights: Highlight[] = [];
-
-  const cid = 'celestial-map';
-  let host!: HTMLDivElement;
-  let ro: ResizeObserver | null = null;
-  let raf = 0;
-
-  function loadScript(src: string) {
-    return new Promise<void>((resolve, reject) => {
-      const s = document.createElement('script');
-      s.src = src;
-      s.async = false;
-      s.onload = () => resolve();
-      s.onerror = () => reject(new Error(`Failed to load ${src}`));
-      document.head.appendChild(s);
-    });
-  }
-
-  function toGeoJSONPoints(list: Highlight[]) {
-    return {
-      type: 'FeatureCollection',
-      features: list.map((h) => ({
-        type: 'Feature',
-        properties: { name: h.label, mag: h.mag ?? null },
-        geometry: { type: 'Point', coordinates: [h.ra, h.dec] } // RA/Dec（度）
-      }))
-    };
-  }
-
-  // 防抖：容器尺寸变化时重绘
-  function doResize() {
-    cancelAnimationFrame(raf);
-    raf = requestAnimationFrame(() => {
-      // 0 = 让库按父容器宽度自适应
-      // @ts-ignore
-      window.Celestial?.resize(0);
-    });
-  }
-
-  onMount(async () => {
-    try {
-      await loadScript('/vendor/celestial/d3.v3.min.js');
-      await loadScript('/vendor/celestial/celestial.min.js');
-      const Celestial = (window as any).Celestial;
-
-      if (isNaN(date.getTime())) date = new Date();
-
-      // 关键：width: 0 → 使用父容器宽度（由 .celestial-box 决定）
-      Celestial.display({
-        container: cid,                  // 不带 '#'
-        datapath: '/vendor/celestial/data/',
-        projection: 'stereographic',     // 注意不是 'stereo'
-        width: 0,                        // 响应式：按父容器宽度
-        transform: 'equatorial',
-        stars: { show: false, limit: 6, colors: true, names: true },
-        constellations: { show: false, lines: true, names: true, boundaries: false },
-        horizon: { show: false },
-        geopos: [lat, lon],
-        date
-      });
-
-      // 诊断点（可保留/删除）
-      Celestial.add({
-        type: 'FeatureCollection',
-        features: [{ type: 'Feature', properties: { name: 'TEST • RA0° Dec0°' }, geometry: { type: 'Point', coordinates: [0, 0] } }]
-      }, { id: 'diagnostic-point', type: 'point', size: 4, color: '#00ffff', names: true });
-
-      // 高亮层
-      Celestial.add(toGeoJSONPoints(highlights), {
-        id: 'visible-highlights',
-        type: 'point',
-        color: '#ffcc88',
-        size: 2.2,
-        magnitude: true,
-        names: true,
-        style: { fill: '#ffcc88', stroke: '#000', width: 1 }
-      });
-
-      Celestial.redraw?.();
-
-      // 监听父容器尺寸变化（布局/列宽/侧栏变化等都会触发）
-      ro = new ResizeObserver(doResize);
-      ro.observe(host); // 也可以 observe document.getElementById(cid)!
-      window.addEventListener('resize', doResize);
-      window.addEventListener('orientationchange', doResize);
-    } catch (e) {
-      console.error('[Celestial] init error', e);
-    }
-  });
-
-  onDestroy(() => {
-    ro?.disconnect();
-    window.removeEventListener('resize', doResize);
-    window.removeEventListener('orientationchange', doResize);
-  });
-
-  // 外部 props 变化时刷新地点/时间与高亮（不重复 display）
-  $: (async () => {
-    const Celestial = (typeof window !== 'undefined') && (window as any).Celestial;
-    if (!Celestial) return;
-
-    try {
-      Celestial.skyview?.({ location: [lat, lon], date });
-
-      Celestial.remove?.('visible-highlights');
-      Celestial.add(toGeoJSONPoints(highlights), {
-        id: 'visible-highlights',
-        type: 'point',
-        color: '#ffcc88',
-        size: 2.2,
-        magnitude: true,
-        names: true,
-        style: { fill: '#ffcc88', stroke: '#000', width: 1 }
-      });
-
-      Celestial.redraw?.();
-    } catch {
-      /* noop */
-    }
-  })();
+	function center(): [number, number, number] {
+		const ra = lstInDegrees(date, lon);
+		return [ra > 180 ? ra - 360 : ra, lat, 0];
+	}
+	function colors() {
+		const vars = getComputedStyle(document.documentElement);
+		const get = (name: string) => vars.getPropertyValue(name).trim();
+		return {
+			background: { fill: get('--chart-bg'), stroke: get('--border'), opacity: 1 },
+			lines: {
+				graticule: { show: true, stroke: get('--chart-line'), width: 0.7, opacity: 0.3 },
+				equatorial: { show: false },
+				ecliptic: { show: false },
+				galactic: { show: false },
+				supergalactic: { show: false }
+			}
+		};
+	}
+	function drawHighlights() {
+		const api = celestialApi();
+		if (!api?.context) return;
+		const vars = getComputedStyle(document.documentElement),
+			ctx = api.context;
+		ctx.save();
+		ctx.fillStyle = vars.getPropertyValue('--star').trim();
+		ctx.textBaseline = 'middle';
+		ctx.font = '11px system-ui';
+		for (const star of highlights) {
+			const point: [number, number] = [star.ra > 180 ? star.ra - 360 : star.ra, star.dec];
+			if (!api.clip(point)) continue;
+			const [x, y] = api.mapProjection(point);
+			if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+			ctx.beginPath();
+			ctx.arc(x, y, Math.max(1.8, 3.5 - (star.mag ?? 2) * 0.5), 0, Math.PI * 2);
+			ctx.fill();
+			if ((star.mag ?? 2) <= 2.5) ctx.fillText(star.label, x + 7, y - 8);
+		}
+		ctx.restore();
+	}
+	$effect(() => {
+		void [lat, lon, date, highlights];
+		if (ready) {
+			const api = celestialApi();
+			api?.rotate({ center: center() });
+			api?.redraw();
+		}
+	});
+	onMount(() => {
+		let disposed = false;
+		let resize: ResizeObserver | undefined, theme: MutationObserver | undefined;
+		const previousResize = window.onresize;
+		let libraryResize: typeof window.onresize;
+		void (async () => {
+			try {
+				const api = await loadCelestial();
+				if (disposed) return;
+				// Celestial is a singleton: one layer, registered once per mount.
+				// Its API accepts a raw callback, not a GeoJSON + options pair.
+				api.clear();
+				api.add({ type: 'raw', callback: () => api.redraw(), redraw: drawHighlights });
+				api.display({
+					container: 'celestial-map',
+					datapath: '/vendor/celestial/data/',
+					projection: 'stereographic',
+					width: Math.floor(host.clientWidth),
+					transform: 'equatorial',
+					center: center(),
+					geopos: null,
+					form: false,
+					location: false,
+					controls: false,
+					interactive: true,
+					stars: { show: false },
+					planets: { show: false, which: [] },
+					dsos: { show: false },
+					mw: { show: false },
+					constellations: { names: false, lines: false, bounds: false },
+					...colors()
+				});
+				libraryResize = window.onresize;
+				ready = true;
+				let lastWidth = Math.floor(host.clientWidth);
+				resize = new ResizeObserver(() => {
+					const width = Math.floor(host.clientWidth);
+					if (width <= 0 || width === lastWidth) return;
+					lastWidth = width;
+					cancelAnimationFrame(frame);
+					frame = requestAnimationFrame(() => api.resize({ width }));
+				});
+				resize.observe(host);
+				theme = new MutationObserver(() => api.apply(colors()));
+				theme.observe(document.documentElement, {
+					attributes: true,
+					attributeFilter: ['data-night']
+				});
+			} catch {
+				if (!disposed) failed = true;
+			}
+		})();
+		return () => {
+			disposed = true;
+			resize?.disconnect();
+			theme?.disconnect();
+			cancelAnimationFrame(frame);
+			if (ready) {
+				celestialApi()?.clear();
+				if (window.onresize === libraryResize) window.onresize = previousResize;
+			}
+		};
+	});
 </script>
 
+<div class="celestial-wrap" bind:this={host}>
+	{#if failed}<p class="empty-state" role="alert">{i18n.tr('celestial_error')}</p>{:else}
+		{#if !ready}<p class="loading" role="status">{i18n.tr('loading_map')}</p>{/if}
+		<div id="celestial-map" aria-label={i18n.tr('celestial_map')}></div>
+	{/if}
+</div>
+
 <style>
-  /* 外层：限制最大宽度；你也可在页面栅格里控制 */
-  .celestial-wrap {
-    width: 100%;
-    max-width: var(--celestial-max, 640px);
-  }
-
-  /* 关键：让容器成为自适应的正方形（高度随宽度变） */
-  .celestial-box {
-    width: 100%;
-    aspect-ratio: 1 / 1;
-    background: #0a0e17;
-    border: 1px solid #444;
-  }
-
-  /* 让库插入的 canvas/svg 占满容器 —— 全局选择器 */
-  :global(#celestial-map > canvas),
-  :global(#celestial-map > svg) {
-    width: 100% !important;
-    height: 100% !important;
-    display: block;
-  }
+	.celestial-wrap {
+		width: 100%;
+		position: relative;
+		min-height: 250px;
+		padding-top: 16px;
+	}
+	#celestial-map {
+		width: 100%;
+	}
+	.loading {
+		position: absolute;
+		top: 45%;
+		width: 100%;
+		text-align: center;
+		font-size: 0.8rem;
+		color: var(--muted);
+	}
+	:global(#celestial-map canvas) {
+		max-width: 100%;
+		display: block;
+		border-radius: 12px;
+	}
 </style>
