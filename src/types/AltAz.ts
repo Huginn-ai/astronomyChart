@@ -1,5 +1,4 @@
 export type AltAz = {
-    altDeg: number;
-    azDeg: number;
-  };
-  
+	altDeg: number;
+	azDeg: number;
+};
